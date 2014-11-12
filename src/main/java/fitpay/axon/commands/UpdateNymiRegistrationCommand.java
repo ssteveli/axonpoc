@@ -1,18 +1,16 @@
 package fitpay.axon.commands;
 
-import java.util.UUID;
-
 import org.axonframework.commandhandling.annotation.TargetAggregateIdentifier;
 
-public class CreateNymiRegistrationCommand {
+public class UpdateNymiRegistrationCommand {
 
     @TargetAggregateIdentifier
     protected final String id;
     private final char[] vkId;
     private final char[] vkKey;
 
-    public CreateNymiRegistrationCommand(char[] vkId, char[] vkKey) {
-        this.id = UUID.randomUUID().toString();
+    public UpdateNymiRegistrationCommand(String id, char[] vkId, char[] vkKey) {
+        this.id = id;
         this.vkId = vkId;
         this.vkKey = vkKey;
     }

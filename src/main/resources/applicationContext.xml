@@ -12,6 +12,7 @@
     
     <axon:event-sourcing-repository 
         id="nymiRegistrationRepository"
+        event-store="eventStore"
         aggregate-type="fitpay.axon.domain.NymiRegistration"/>
     
     <axon:aggregate-command-handler 
