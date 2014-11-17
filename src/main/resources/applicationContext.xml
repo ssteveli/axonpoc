@@ -35,7 +35,15 @@
     <axon:event-bus id="eventBus" terminal="terminal"/>
     
     <axon:command-bus id="commandBus"
-        transaction-manager="transactionManager" />
+        transaction-manager="transactionManager">
+        <axon:dispatchInterceptors>
+            <bean id="axonBeanValidator" class="org.axonframework.commandhandling.interceptors.BeanValidationInterceptor">
+                <constructor-arg name="validatorFactory">
+                    <bean class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean"/>
+                </constructor-arg>
+            </bean>
+        </axon:dispatchInterceptors>
+    </axon:command-bus>
 
     <axon:event-sourcing-repository id="nymiRegistrationRepository"
         aggregate-type="fitpay.axon.domain.NymiRegistration" />
