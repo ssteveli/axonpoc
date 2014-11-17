@@ -1,32 +1,135 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns:axon="http://www.axonframework.org/schema/core"
-	xsi:schemaLocation="http://www.axonframework.org/schema/core http://www.axonframework.org/schema/axon-core-2.0.xsd 
-    http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:amqp="http://www.axonframework.org/schema/amqp"
+    xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+    xsi:schemaLocation="http://www.axonframework.org/schema/core http://www.axonframework.org/schema/axon-core-2.3.xsd
+		http://www.axonframework.org/schema/amqp http://www.axonframework.org/schema/axon-amqp.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.1.xsd
+        http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
 
-    <axon:annotation-config/>
+    <bean
+        class="org.springframework.context.support.PropertySourcesPlaceholderConfigurer">
+        <property name="ignoreResourceNotFound" value="true" />
+        <property name="locations">
+            <list>
+                <value>classpath:config.properties</value>
+                <value>classpath:${spring.profiles.active}.properties
+                </value>
+            </list>
+        </property>
+    </bean>
+
+    <context:component-scan base-package="fitpay" />
+    <axon:annotation-config />
+
+    <bean id="serializer" class="org.axonframework.serializer.json.JacksonSerializer"/>
     
-    <axon:command-bus id="commandBus"/>
-    <axon:event-bus id="eventBus"/>
+    <amqp:terminal id="terminal" exchange-name="fitpay.axon">
+        <amqp:default-configuration/>
+    </amqp:terminal>
     
-    <axon:event-sourcing-repository 
-        id="nymiRegistrationRepository"
-        event-store="eventStore"
-        aggregate-type="fitpay.axon.domain.NymiRegistration"/>
+    <axon:event-bus id="eventBus" terminal="terminal"/>
     
-    <axon:aggregate-command-handler 
-        command-bus="commandBus" 
-        aggregate-type="fitpay.axon.domain.NymiRegistration" 
-        repository="nymiRegistrationRepository"/>
-        
-    <axon:filesystem-event-store 
-        id="eventStore"
-        base-dir="./eventsdb"/>
-       
-    <bean class="org.axonframework.commandhandling.gateway.CommandGatewayFactoryBean">
-        <property name="commandBus" ref="commandBus"/>
+    <axon:command-bus id="commandBus"
+        transaction-manager="transactionManager" />
+
+    <axon:event-sourcing-repository id="nymiRegistrationRepository"
+        aggregate-type="fitpay.axon.domain.NymiRegistration" />
+
+    <axon:aggregate-command-handler id="nymiRegistrationHandler"
+        command-bus="commandBus" aggregate-type="fitpay.axon.domain.NymiRegistration"
+        repository="nymiRegistrationRepository" />
+
+    <bean id="entityManagerProvider"
+        class="org.axonframework.common.jpa.ContainerManagedEntityManagerProvider" />
+
+    <axon:jpa-event-store id="eventStore" entity-manager-provider="entityManagerProvider" />
+
+    <bean
+        class="org.axonframework.commandhandling.gateway.CommandGatewayFactoryBean">
+        <property name="commandBus" ref="commandBus" />
+    </bean>
+
+    <bean class="fitpay.axon.eventhandlers.NymiRegistrationEventHandler" />
+
+    <bean id="axonTransactionManager"
+        class="org.axonframework.unitofwork.SpringTransactionManager">
+        <constructor-arg name="transactionManager" ref="transactionManager" />
     </bean>
     
-    <bean class="fitpay.axon.eventhandlers.NymiRegistrationEventHandler"/>
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+        <property name="driverClassName" value="${jdbc.driver}" />
+        <property name="url" value="${jdbc.url}" />
+        <property name="username" value="${jdbc.username}" />
+        <property name="password" value="${jdbc.password}" />
+        <property name="initialSize" value="${jdbc.initialSize:2}" />
+        <property name="maxActive" value="${jdbc.maxActive:25}" />
+        <property name="maxIdle" value="${jdbc.maxIdle:2}" />
+    </bean>
+
+    <bean
+        class="org.springframework.orm.jpa.support.PersistenceAnnotationBeanPostProcessor" />
+
+    <rabbit:connection-factory
+        id="rabbitMqConnectionFactory"
+        addresses="${rabbitmq.hosts}"
+        username="${rabbitmq.username}"
+        password="${rabbitmq.password}"
+        virtual-host="${rabbitmq.vhost}"/>
+        
+    <rabbit:admin 
+        auto-startup="true"
+        connection-factory="rabbitMqConnectionFactory" 
+        ignore-declaration-exceptions="false"
+        id="rabbitMqAdmin"/>
+    
+    <rabbit:queue 
+        name="default" 
+        auto-declare="true" 
+        auto-delete="false" 
+        declared-by="rabbitMqAdmin"/>
+    
+     <rabbit:fanout-exchange name="fitpay.axon">
+        <rabbit:bindings>
+            <rabbit:binding queue="default"/>
+        </rabbit:bindings>
+    </rabbit:fanout-exchange>
+    
+    <bean id="entityManagerFactory"
+        class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+        <property name="dataSource" ref="dataSource" />
+        <property name="jpaVendorAdapter">
+            <bean
+                class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+                <property name="database" value="POSTGRESQL" />
+                <property name="showSql" value="true" />
+                <property name="generateDdl" value="false" />
+                <property name="databasePlatform"
+                    value="org.hibernate.dialect.PostgreSQL9Dialect" />
+            </bean>
+        </property>
+        <property name="jpaProperties">
+            <props>
+                <prop key="hibernate.default_schema">fitpay</prop>
+                <prop key="hibernate.cache.use_second_level_cache">false</prop>
+            </props>
+        </property>
+        <property name="packagesToScan">
+            <array>
+                <value>org.axonframework.eventstore.jpa</value>
+                <value>org.axonframework.saga.repository.jpa</value>
+            </array>
+        </property>
+        <property name="persistenceProviderClass"
+            value="org.hibernate.jpa.HibernatePersistenceProvider" />
+        <property name="validationMode" value="AUTO" />
+    </bean>
+
+    <bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+        <property name="entityManagerFactory" ref="entityManagerFactory" />
+    </bean>
 </beans>

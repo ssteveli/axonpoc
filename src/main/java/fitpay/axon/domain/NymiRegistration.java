@@ -1,21 +1,16 @@
 package fitpay.axon.domain;
 
 import java.util.Arrays;
-import java.util.Collections;
 
-import org.axonframework.commandhandling.annotation.CommandHandler;
-import org.axonframework.domain.DomainEventMessage;
-import org.axonframework.eventhandling.annotation.EventHandler;
-import org.axonframework.eventsourcing.AbstractEventSourcedAggregateRoot;
-import org.axonframework.eventsourcing.EventSourcedEntity;
+import org.axonframework.eventsourcing.annotation.AbstractAnnotatedAggregateRoot;
 import org.axonframework.eventsourcing.annotation.AggregateIdentifier;
+import org.axonframework.eventsourcing.annotation.EventSourcingHandler;
 
 import fitpay.axon.commands.CreateNymiRegistrationCommand;
-import fitpay.axon.commands.UpdateNymiRegistrationCommand;
 import fitpay.axon.events.NymiRegistrationCreatedEvent;
 import fitpay.axon.events.NymiRegistrationUpdatedEvent;
 
-public class NymiRegistration extends AbstractEventSourcedAggregateRoot<String> {
+public class NymiRegistration extends AbstractAnnotatedAggregateRoot<String> {
     private static final long serialVersionUID = 5172048164793954016L;
 
     @AggregateIdentifier
@@ -26,49 +21,32 @@ public class NymiRegistration extends AbstractEventSourcedAggregateRoot<String> 
     public NymiRegistration() {
     }
     
-    @CommandHandler
     public NymiRegistration(CreateNymiRegistrationCommand cmd) {
-        apply(new NymiRegistrationCreatedEvent(cmd.getId(), cmd.getVkId(), cmd.getVkKey()));
-    }
-    
-    @EventHandler
-    public void on(NymiRegistrationCreatedEvent event) {
-        this.id = event.getId();
-        this.vkId = event.getVkId();
-        this.vkKey = event.getVkKey();
-    }
-
-    @EventHandler
-    public void on(NymiRegistrationUpdatedEvent event) {
-        this.vkId = event.getVkId();
-        this.vkKey = event.getVkKey();
-        System.out.println("update isLive? " + isLive());
-    }
-    
-    @CommandHandler
-    public void update(UpdateNymiRegistrationCommand cmd) {
+        this.id = cmd.getId();
         this.vkId = cmd.getVkId();
         this.vkKey = cmd.getVkKey();
+        
+        apply(new NymiRegistrationCreatedEvent(cmd.getId(), cmd.getVkId(), cmd.getVkKey()));
+    }
+
+    public void update(final char[] vkId, final char[] vkKey) {
+        this.vkId = vkId;
+        this.vkKey = vkKey;
+        
         apply(new NymiRegistrationUpdatedEvent(id, vkId, vkKey));
     }
+
+    @EventSourcingHandler
+    public void handle(final NymiRegistrationCreatedEvent e) {
+        this.id = e.getId();
+        this.vkId = e.getVkId();
+        this.vkKey = e.getVkKey();
+    }
     
-    public String getIdentifier() {
-        return id;
-    }
-
-    @Override
-    protected Iterable<? extends EventSourcedEntity> getChildEntities() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    protected void handle(@SuppressWarnings("rawtypes") DomainEventMessage msg) {
-        System.out.println("msg: " + msg + ", payload: " + msg.getPayload());
-        if (NymiRegistrationCreatedEvent.class.isAssignableFrom(msg.getPayloadType())) {
-            on((NymiRegistrationCreatedEvent)msg.getPayload());
-        } else if (NymiRegistrationUpdatedEvent.class.isAssignableFrom(msg.getPayloadType())) {
-            on((NymiRegistrationUpdatedEvent)msg.getPayload());
-        }
+    @EventSourcingHandler
+    public void handle(final NymiRegistrationUpdatedEvent e) {
+        this.vkId = e.getVkId();
+        this.vkKey = e.getVkKey();
     }
 
     @Override

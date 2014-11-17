@@ -8,6 +8,7 @@ import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.repository.AggregateNotFoundException;
 import org.axonframework.repository.Repository;
 import org.axonframework.unitofwork.DefaultUnitOfWork;
+import org.axonframework.unitofwork.TransactionManager;
 import org.axonframework.unitofwork.UnitOfWork;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -22,6 +23,7 @@ public class NymiRegistrationRunner {
     private void run() {
         ClassPathXmlApplicationContext ctx = 
                 new ClassPathXmlApplicationContext("classpath:/applicationContext.xml");
+                
         gw = ctx.getBean(CommandGateway.class);
         
         char[] vkId = new char[]{ '0' };
@@ -40,12 +42,14 @@ public class NymiRegistrationRunner {
         }
         
         @SuppressWarnings("unchecked")
-        Repository<NymiRegistration> repo = ctx.getBean(Repository.class);
+        Repository<NymiRegistration> repo = ctx.getBean("nymiRegistrationRepository", Repository.class);
+        @SuppressWarnings("rawtypes")
+        TransactionManager tm = ctx.getBean(TransactionManager.class);
         
-        UnitOfWork uow = DefaultUnitOfWork.startAndGet();
-        NymiRegistration savedReg = repo.load("6790ce88-6a4c-4727-8e47-c752b699c89f");
+        UnitOfWork uow = DefaultUnitOfWork.startAndGet(tm);
+        NymiRegistration savedReg = repo.load("2c88bfbd-2081-4dd2-ad14-e5f20dfa6688");
         System.out.println("saved Reg: " + savedReg);
-        
+
         try {
             repo.load("123");
         } catch (AggregateNotFoundException e) {
