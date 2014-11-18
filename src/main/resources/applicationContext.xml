@@ -43,6 +43,9 @@
                 </constructor-arg>
             </bean>
         </axon:dispatchInterceptors>
+        <axon:handlerInterceptors>
+            <bean class="org.axonframework.commandhandling.interceptors.SerializationOptimizingInterceptor"/>
+        </axon:handlerInterceptors>
     </axon:command-bus>
 
     <axon:event-sourcing-repository id="nymiRegistrationRepository"
